@@ -127,3 +127,6 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+stairs/data/*.csv 
+stairs/baseline_vanilla/*.ply
