@@ -146,7 +146,7 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
 
 if __name__ == "__main__":
 
-    
+    overlap_thresh = 0.7
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='Subset of the ASL dataset to compare')
     FLAGS = parser.parse_args()
@@ -162,7 +162,7 @@ if __name__ == "__main__":
 
     for f1 in range(data_size):
         for f2 in range(data_size):
-            if f1 >= f2: continue
+            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
             print(f'Computing scan_id {f1} against {f2}')
             log = calc_one_icp(f1,f2,log,which='stairs')
 

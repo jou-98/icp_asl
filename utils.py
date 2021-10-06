@@ -157,6 +157,15 @@ def draw_registration_result(source, target, transformation=None, filename='a+b.
     pcd.colors = o3d.utility.Vector3dVector(rgb)
     o3d.io.write_point_cloud(filename, pcd)
 
+def overlap_check(f1,f2,which='stairs',thresh=0.70):
+    if which == 'stairs': fname = './stairs/data/overlap_stairs.csv'
+    percentages = np.genfromtxt(fname,delimiter=',',dtype=np.float32)[:,:-1]
+    l = len(percentages)
+    percentages = percentages.reshape((l,l))
+    return percentages[f1,f2] >= thresh 
+    
+
+
 
 def euler_angles(t):
     x = np.arctan2(t[2,1],t[2,2])
