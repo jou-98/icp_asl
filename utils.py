@@ -162,7 +162,7 @@ def overlap_check(f1,f2,which='stairs',thresh=0.70):
     percentages = np.genfromtxt(fname,delimiter=',',dtype=np.float32)[:,:-1]
     l = len(percentages)
     percentages = percentages.reshape((l,l))
-    return percentages[f1,f2] >= thresh 
+    return percentages[f2,f1] >= thresh 
     
 def inverse_mat(mat):
     newmat = np.zeros_like(mat)
