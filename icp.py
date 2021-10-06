@@ -124,19 +124,13 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     gt = gt.reshape((-1,4,4))
     t1 = gt[file1]
     t2 = gt[file2]
-    t1_inv = np.zeros_like(t1)
-    t1_inv[:3,:3] = t1[:3,:3].T
-    t1_inv[:3,3] = 1/t1[:3,3]
-    t1_inv[3,3] = 1.0
-    t2_inv = np.zeros_like(t2)
-    t2_inv[:3,:3] = t2[:3,:3].T
-    t2_inv[:3,3] = 1/t2[:3,3]
-    t2_inv[3,3] = 1.0
+    t1_inv = inverse_mat(t1)
+    t2_inv = inverse_mat(t2)
     reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
     # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
 
-    rel = np.matmul(t1,t2_inv)
+    rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
     TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
     RE = rotation_error(T,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)

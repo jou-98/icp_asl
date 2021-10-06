@@ -164,13 +164,26 @@ def overlap_check(f1,f2,which='stairs',thresh=0.70):
     percentages = percentages.reshape((l,l))
     return percentages[f1,f2] >= thresh 
     
-
+def inverse_mat(mat):
+    newmat = np.zeros_like(mat)
+    newmat[:3,:3] = mat[:3,:3].T
+    newmat[:3,3] = -np.matmul(mat[:3,:3].T,mat[:3,3])
+    newmat[3,3] = 1.0
+    #print(f'Euler angle for old matrix is {euler_angles(mat)}, for new matrix is {euler_angles(newmat)}')
+    return newmat
 
 
 def euler_angles(t):
-    x = np.arctan2(t[2,1],t[2,2])
-    y = np.arctan2(-t[2,0],np.sqrt(t[2,1]*t[2,1]+t[2,2]*t[2,2]))
-    z = np.arctan2(t[1,0],t[0,0])
+    sy = np.sqrt(t[0,0]*t[0,0]+t[1,0]*t[1,0])
+    if sy < 1e-6:
+        x = np.arctan2(-t[1,2],t[1,1])
+        y = np.arctan2(-t[2,0],sy)
+        z = 0
+    else:
+        sy = np.sqrt(t[2,1]*t[2,1]+t[2,2]*t[2,2])
+        x = np.arctan2(t[2,1],t[2,2])
+        y = np.arctan2(-t[2,0],sy) # Changed from np.sqrt(t[2,1]*t[2,1]+t[2,2]*t[2,2])
+        z = np.arctan2(t[1,0],t[0,0])
     return np.rad2deg(np.array([x,y,z]).reshape((-1,1)))
 
 
