@@ -125,7 +125,7 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     gt = gt.reshape((-1,4,4))
     t1 = gt[file1]
     t2 = gt[file2]
-    reGT = rotation_error(t1, t2)
+    reGT = rotation_error(t1.T, t2.T)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
     # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
     rel = np.matmul(t1,t2.T)
@@ -138,15 +138,16 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     logger.record_reGT(reGT)
     logger.record_te(TE)
     #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
-    #draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
+    draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
     draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
+    print(f'pcd1 is yellow and pcd2 is blue')
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
     return logger
 
 if __name__ == "__main__":
 
-    overlap_thresh = 0.7
+    overlap_thresh = 0.8
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='Subset of the ASL dataset to compare')
     FLAGS = parser.parse_args()
