@@ -119,16 +119,24 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     #print(f'Shape of pts1 is {pts1.shape}; Shape of pts2 is {pts2.shape}')
     T, dist, i, logger = icp(pts1, pts2, max_iter=200, threshold=0.00001,logger=logger)
     print(f'Done in {i} iterations')
-    print(T)
     confdir = get_conf_dir(name=which)
     gt = np.loadtxt(confdir,delimiter=',',skiprows=1,usecols=range(1,17),dtype=np.float32)
     gt = gt.reshape((-1,4,4))
     t1 = gt[file1]
     t2 = gt[file2]
-    reGT = rotation_error(t1.T, t2.T)
+    t1_inv = np.zeros_like(t1)
+    t1_inv[:3,:3] = t1[:3,:3].T
+    t1_inv[:3,3] = 1/t1[:3,3]
+    t1_inv[3,3] = 1.0
+    t2_inv = np.zeros_like(t2)
+    t2_inv[:3,:3] = t2[:3,:3].T
+    t2_inv[:3,3] = 1/t2[:3,3]
+    t2_inv[3,3] = 1.0
+    reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
     # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
-    rel = np.matmul(t1,t2.T)
+
+    rel = np.matmul(t1,t2_inv)
     #rel = mul_transform(t1,t2)
     TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
     RE = rotation_error(T,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
@@ -138,8 +146,10 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     logger.record_reGT(reGT)
     logger.record_te(TE)
     #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
-    draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
-    draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
+    if RE >= 30:
+        print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
+        draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
+        draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
     print(f'pcd1 is yellow and pcd2 is blue')
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
