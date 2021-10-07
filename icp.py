@@ -151,10 +151,12 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
 
 if __name__ == "__main__":
 
-    overlap_thresh = 0.8
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='Subset of the ASL dataset to compare')
+    parser.add_argument('--overlap', type=float, default=0.7, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
+
+    overlap_thresh = FLAGS.overlap
 
     RE_list = []
     TE_list = []
