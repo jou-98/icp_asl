@@ -173,7 +173,7 @@ if __name__ == "__main__":
         for f2 in range(data_size):
             if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
             print(f'Computing scan_id {f1} against {f2}')
-            log = calc_one_icp(f1,f2,log,which='stairs')
+            log = calc_one_icp(f1,f2,log,which=which)
 
         
     print(f'Results for (mostly) unmodified ICP algorithm on {which} dataset.')

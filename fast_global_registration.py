@@ -2,16 +2,15 @@ import open3d as o3d
 import numpy as np
 from utils import *
 from time import time
+from glob import glob
 import argparse
 from Logger import Logger 
 from numpy.linalg import norm as pnorm
 from metadata import *
 
 
-def prepare_dataset(src,dst,voxel_size):
+def prepare_dataset(source,target,voxel_size):
     print(":: Load two point clouds and disturb initial pose.")
-    source,_ = o3d_read_pc(src)
-    target,_ = o3d_read_pc(dst)
     trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                              [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     source.transform(trans_init)

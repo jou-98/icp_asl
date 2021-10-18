@@ -1,11 +1,14 @@
 import numpy as np 
 import open3d as o3d 
 from time import time
+from glob import glob
 from Logger import Logger
 from utils import * 
 import argparse
 from numpy.linalg import norm as pnorm
 from metadata import *
+
+
 
 def preprocess_point_cloud(pcd, voxel_size):
     print(":: Downsample with a voxel size %.3f." % voxel_size)
@@ -101,11 +104,13 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
     logger.record_reGT(reGT)
     logger.record_te(TE)
     #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
+    """
     if RE >= 30:
         print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
-        draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
-        draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
-    print(f'pcd1 is yellow and pcd2 is blue')
+        draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_ransac/'+str(file1)+'_'+str(file2)+'_orig.ply')
+        draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_ransac/'+str(file1)+'_'+str(file2)+'.ply')
+        print(f'pcd1 is yellow and pcd2 is blue')
+    """
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
     return logger
@@ -119,32 +124,21 @@ if __name__=='__main__':
 
     voxel_size = FLAGS.voxel_size
     which = FLAGS.dataset
+    overlap_thresh = FLAGS.overlap
+
+    files = glob(which+'/data/Hokuyo_*.csv')
+    data_size = len(files)
 
     RE_list = []
     TE_list = []
     t_list = []
     log = Logger()
 
-    if which == dataset[0]:
-        for i in range(len(bunny_files)):
-            for j in range(len(bunny_files)):
-                if i != j:
-                    log = calc_one_ransac(bunny_files[i],bunny_files[j],voxel_size=voxel_size,which='bunny',logger=log)
-    elif which == dataset[1]:
-        for i in range(len(stand_files)):
-            for j in range(len(stand_files)):
-                if np.abs(j-i) < 4 and j != i:
-                    log = calc_one_ransac(stand_files[i],stand_files[j],voxel_size=voxel_size,which='happy_stand',logger=log)
-    elif which == dataset[2]:
-        for i in range(len(side_files)):
-            for j in range(len(side_files)):
-                if np.abs(j-i) < 4 and j != i:
-                    log = calc_one_ransac(side_files[i],side_files[j],voxel_size=voxel_size,which='happy_side',logger=log)
-    elif which == dataset[3]:
-        for i in range(len(back_files)):
-            for j in range(len(back_files)):
-                if np.abs(j-i) < 4 and j != i:
-                    log = calc_one_ransac(back_files[i],back_files[j],voxel_size=voxel_size,which='happy_back',logger=log)
+    for f1 in range(data_size):
+        for f2 in range(data_size):
+            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
+            print(f'Computing scan_id {f1} against {f2}')
+            log = calc_one_ransac(f1,f2,voxel_size=voxel_size,which=which,logger=log)
 
     print(f'Results for RANSAC algorithm on {which} dataset.')
     print(f'In total, {log.count} pairs of point clouds are evaluated.')
