@@ -1,4 +1,4 @@
-dataset = ['stairs']
+dataset = ['stairs','apartment']
 suffix = './'
 
 re_thres = 15.0 

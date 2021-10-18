@@ -50,7 +50,7 @@ class Logger:
     def avg_meta(self):
         return self.t_meta / self.count 
 
-    def recall(self,re_thres=5,te_thres=1.5):
+    def recall(self,re_thres=15,te_thres=1.5):
         c = 0
         for i in range(len(self.re)):
             if self.re[i] <= re_thres and self.te[i] <= te_thres:

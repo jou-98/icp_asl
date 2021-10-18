@@ -24,10 +24,8 @@ def preprocess_point_cloud(pcd, voxel_size):
     return pcd_down, pcd_fpfh
 
 
-def prepare_dataset(src,dst,voxel_size):
+def prepare_dataset(source,target,voxel_size):
     #print(":: Load two point clouds and disturb initial pose.")
-    source,_ = o3d_read_pc(src)
-    target,_ = o3d_read_pc(dst)
     trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                              [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     source.transform(trans_init)
@@ -40,8 +38,6 @@ def execute_global_registration(source_down, target_down, source_fpfh,
                                 target_fpfh, voxel_size):
     distance_threshold = voxel_size * 1.5
     print(":: RANSAC registration on downsampled point clouds.")
-    #print("   Since the downsampling voxel size is %.3f," % voxel_size)
-    #print("   we use a liberal distance threshold %.3f." % distance_threshold)
     result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
         source_down, target_down, source_fpfh, target_fpfh, True,
         distance_threshold,
@@ -70,25 +66,11 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
                                 [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     suffix=''
     f1,f2=file1,file2
-    if which == 'bunny':
-        suffix = 'bunny/data/'
-        if 'bun' in file1: f1 = file1[-3:]
-        if 'bun' in file2: f2 = file2[-3:]
-    elif which == 'happy_stand':
-        suffix = 'happy_stand/data/'
-        f1 = file1[16:]
-        f2 = file2[16:]
-    elif which == 'happy_side':
-        suffix = 'happy_side/data/'
-        f1 = file1[15:]
-        f2 = file2[15:]
-    elif which == 'happy_back':
-        suffix = 'happy_back/data/'
-        f1 = file1[15:]
-        f2 = file2[15:]
+    pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
+    pcd2 = open_csv(get_fname(file2,suffix,which), astype='pcd')
     print(f'==================== Testing {f1}.ply against {f2}.ply ====================')
 
-    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(suffix+file1+'.ply',suffix+file2+'.ply',voxel_size)
+    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(pcd1,pcd2,voxel_size)
 
     result_ransac = execute_global_registration(source_down, target_down,
                                                 source_fpfh, target_fpfh,
@@ -99,32 +81,40 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
 
     T = result_icp.transformation
     confdir = get_conf_dir(name=which)
-    tx1,ty1,tz1,qx1,qy1,qz1,qw1 = get_quat(confdir,file1)
-    tx2,ty2,tz2,qx2,qy2,qz2,qw2 = get_quat(confdir,file2)
-    t1 = quat_to_mat(tx1,ty1,tz1,qx1,qy1,qz1,qw1)
-    t2 = quat_to_mat(tx2,ty2,tz2,qx2,qy2,qz2,qw2)
-    reGT = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)
+    gt = np.loadtxt(confdir,delimiter=',',skiprows=1,usecols=range(1,17),dtype=np.float32)
+    gt = gt.reshape((-1,4,4))
+    t1 = gt[file1]
+    t2 = gt[file2]
+    t1_inv = inverse_mat(t1)
+    t2_inv = inverse_mat(t2)
+    reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
-    mat = np.matmul(trans_init[:3,:3],t1[:3,:3])
-    mat = np.matmul(T[:3,:3],mat)
-    qx1, qy1, qz1, qw1 = mat_to_quat(mat)
-    TE = pnorm(t1[:3,3]-(t2[:3,3]-T[:3,3]), ord=2)
-    RE = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
+    # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
+
+    rel = np.matmul(t2_inv,t1)
+    #rel = mul_transform(t1,t2)
+    TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
+    RE = rotation_error(T,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
     print(f'RE = {round(RE,3)}, TE = {round(TE,3)}')
+    #print(f'Extra RE = {rotation_error()}')
     logger.record_re(RE)
     logger.record_reGT(reGT)
     logger.record_te(TE)
-
-    #draw_registration_result(source, target, filename=which+'/baseline_ransac/'+f1+'_'+f2+'_orig.ply')
-    #draw_registration_result(source, target, T,filename=which+'/baseline_ransac/'+f1+'_'+f2+'.ply')
+    #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
+    if RE >= 30:
+        print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
+        draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
+        draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
+    print(f'pcd1 is yellow and pcd2 is blue')
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
     return logger
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='bunny', help='dataset to compare')
+    parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
     parser.add_argument('--voxel_size', type=float, default=0.001, help='size of each voxel')
+    parser.add_argument('--overlap', type=float, default=0.7, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
 
     voxel_size = FLAGS.voxel_size
