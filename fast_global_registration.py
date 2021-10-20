@@ -78,7 +78,7 @@ def calc_one_fgr(file1,file2,voxel_size=0.001,which='bunny',logger=None):
 
     logger.record_meta(time()-meta_start)
     T = result_fast.transformation 
-    confdir = get_conf_dir(name=which)
+    confdir = get_conf_dir(which=which)
     tx1,ty1,tz1,qx1,qy1,qz1,qw1 = get_quat(confdir,file1)
     tx2,ty2,tz2,qx2,qy2,qz2,qw2 = get_quat(confdir,file2)
     t1 = quat_to_mat(tx1,ty1,tz1,qx1,qy1,qz1,qw1)

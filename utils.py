@@ -21,11 +21,13 @@ def open_csv(fname, astype='pcd', skiprows=1):
         return pts 
     return pts
 
-def get_conf_dir(name='stairs'):
-    if name == 'stairs': return 'stairs/data/icpList.csv'
+def get_conf_dir(which='stairs'):
+    return which+'/data/icpList.csv'
 
 def get_fname(fname,suffix='./',which='stairs'):
+    return suffix+which+'/data/Hokuyo_'+str(fname)+'.csv'
     if which == 'stairs': return suffix+which+'/data/Hokuyo_'+str(fname)+'.csv'
+    if which == 'apartment': return suffix+which+'/data/Hokuyo_'+str(fname)+'.csv'
     return None
 
 # Mat1 is the transformation from source to scan_0)
@@ -159,6 +161,7 @@ def draw_registration_result(source, target, transformation=None, filename='a+b.
 
 def overlap_check(f1,f2,which='stairs',thresh=0.70):
     if which == 'stairs': fname = './stairs/data/overlap_stairs.csv'
+    if which == 'apartment': fname = './apartment/data/overlap_apartment.csv'
     percentages = np.genfromtxt(fname,delimiter=',',dtype=np.float32)[:,:-1]
     l = len(percentages)
     percentages = percentages.reshape((l,l))

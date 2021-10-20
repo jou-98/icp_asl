@@ -133,3 +133,11 @@ stairs/data/*.csv
 stairs/data/.DStore
 stairs/baseline_vanilla/*.ply
 stairs/baseline_vanilla/.DStore
+stairs/baseline_ransac/*.ply
+stairs/baseline_ransac/.DStore
+apartment/data/*.csv
+apartment/data/.DStore 
+stairs/baseline_vanilla/*.ply
+stairs/baseline_vanilla/.DStore
+stairs/baseline_ransac/*.ply
+stairs/baseline_ransac/.DStore

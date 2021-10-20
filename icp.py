@@ -100,14 +100,17 @@ def icp(x, y, max_iter=1000, threshold=0.00001, logger=None):
     return T, dist, i, logger
 
 def calc_one_icp(file1, file2, logger=None, which='bunny'):
+    trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
     pcd2 = open_csv(get_fname(file2,suffix,which), astype='pcd')
-    pts1 = np.asarray(pcd1.points)
-    pts2 = np.asarray(pcd2.points)
-    min_points = min(pts1.shape[0],pts2.shape[0])
-    max_points = max(pts1.shape[0],pts2.shape[0])
-    pcd1.points = o3d.utility.Vector3dVector(pts1)
-    pcd2.points = o3d.utility.Vector3dVector(pts2)
+    source = copy.deepcopy(pcd1)
+    target = copy.deepcopy(pcd2)
+    
+    source.transform(trans_init)
+
+    pts1 = np.asarray(source.points)
+    pts2 = np.asarray(target.points)
     start = time()
     pts1, pts2 = downsample(pts1,pts2,method='fps',n_fps=0.3) # Changed from np_rand
     print(f'Shape of pts1 is {pts1.shape}')
@@ -119,7 +122,7 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     #print(f'Shape of pts1 is {pts1.shape}; Shape of pts2 is {pts2.shape}')
     T, dist, i, logger = icp(pts1, pts2, max_iter=200, threshold=0.00001,logger=logger)
     print(f'Done in {i} iterations')
-    confdir = get_conf_dir(name=which)
+    confdir = get_conf_dir(which=which)
     gt = np.loadtxt(confdir,delimiter=',',skiprows=1,usecols=range(1,17),dtype=np.float32)
     gt = gt.reshape((-1,4,4))
     t1 = gt[file1]
@@ -129,6 +132,8 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
     # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
+
+    t_rel = np.matmul(T, trans_init)
 
     rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
@@ -144,7 +149,7 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     if RE >= 15:
         print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
         draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
-        draw_registration_result(pcd1, pcd2, T, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
+        draw_registration_result(pcd1, pcd2, t_rel, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
         print(f'pcd1 is yellow and pcd2 is blue')
     """
     print(f'============================== End of evaluation ==============================\n\n')
@@ -155,7 +160,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='Subset of the ASL dataset to compare')
-    parser.add_argument('--overlap', type=float, default=0.7, help='Minimum overlap of pairs of point cloud to be compared')
+    parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
 
     overlap_thresh = FLAGS.overlap
