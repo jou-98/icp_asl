@@ -83,7 +83,7 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
 
     result_icp = refine_registration(source_down, target_down, source_fpfh, target_fpfh, result_ransac, voxel_size)
     logger.record_meta(time()-meta_start)
-
+    print(f'Time taken for RANSAC computation: {time()-meta_start}s')
     T = result_icp.transformation
     t_rel = np.matmul(T, trans_init)
     confdir = get_conf_dir(which=which)

@@ -138,20 +138,20 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
     TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
-    RE = rotation_error(T,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
+    RE = rotation_error(t_rel,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
     print(f'RE = {round(RE,3)}, TE = {round(TE,3)}')
     #print(f'Extra RE = {rotation_error()}')
     logger.record_re(RE)
     logger.record_reGT(reGT)
     logger.record_te(TE)
     #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
-    """
+    
     if RE >= 15:
         print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
         draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'_orig.ply')
         draw_registration_result(pcd1, pcd2, t_rel, filename=which+'/baseline_vanilla/'+str(file1)+'_'+str(file2)+'.ply')
         print(f'pcd1 is yellow and pcd2 is blue')
-    """
+    
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
     return logger
