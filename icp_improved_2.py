@@ -11,27 +11,39 @@ from scipy.spatial.distance import cosine
 from scipy.spatial.distance import correlation
 import random as rdm
 from Logger import Logger
+from copy import deepcopy as dcopy
 from time import time
-import pyflann
+from glob import glob
+#import pyflann
 from numpy.linalg import norm as pnorm
 
 def my_dist(x,y):
     return correlation(x,y)
 
+def iss(pcd,salient_radius=0.005,non_max_radius=0.005,gamma_21=0.5,gamma_32=0.5):
+    return o3d.geometry.keypoint.compute_iss_keypoints(pcd,
+                                                        salient_radius=salient_radius,
+                                                        non_max_radius=non_max_radius,
+                                                        gamma_21=gamma_21,
+                                                        gamma_32=gamma_21)
 
 def voxel_down(pcd1,pcd2,voxel_size):
     pcd_down1 = pcd1.voxel_down_sample(voxel_size)
     pcd_down2 = pcd2.voxel_down_sample(voxel_size)
-    pts1 = np.asarray(pcd_down1.points)
-    pts2 = np.asarray(pcd_down2.points)
+
+    key1 = iss(pcd_down1,salient_radius=voxel_size,non_max_radius=voxel_size)
+    key2 = iss(pcd_down2,salient_radius=voxel_size,non_max_radius=voxel_size)
+
+    pts1 = np.asarray(key1.points)
+    pts2 = np.asarray(key2.points)
     min_points = min(pts1.shape[0],pts2.shape[0])
     if pts1.shape[0] >= pts2.shape[0]:
         idx = rdm.sample(range(pts1.shape[0]),min_points)
-        pcd_down1.points = o3d.utility.Vector3dVector(pts1[idx])
+        key1.points = o3d.utility.Vector3dVector(pts1[idx])
     else:
         idx = rdm.sample(range(pts2.shape[0]),min_points)
-        pcd_down2.points = o3d.utility.Vector3dVector(pts2[idx])
-    return pcd_down1,pcd_down2
+        key2.points = o3d.utility.Vector3dVector(pts2[idx])
+    return key1,key2
 
 
 def preprocess_point_cloud(pcd,voxel_size):
@@ -47,14 +59,15 @@ def preprocess_point_cloud(pcd,voxel_size):
         o3d.geometry.KDTreeSearchParamHybrid(radius=radius_feature, max_nn=100))
     return pcd,pcd_fpfh
 
-
-def prepare_dataset(src,dst,voxel_size):
+def prepare_dataset(source,target,voxel_size,trans_init=None):
     #print(":: Load two point clouds and disturb initial pose.")
-    source,_ = o3d_read_pc(src)
-    target,_ = o3d_read_pc(dst)
+    if trans_init is None: 
+        trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
+                                [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+    source.transform(trans_init)
     source_down, target_down = voxel_down(source,target,voxel_size)
-    o3d_save_pc(source,'original.ply',pcd_format=True)
-    o3d_save_pc(source_down,'downsampled.ply',pcd_format=True)
+    #o3d_save_pc(source,'original.ply',pcd_format=True)
+    #o3d_save_pc(source_down,'downsampled.ply',pcd_format=True)
     source_down, source_fpfh = preprocess_point_cloud(source_down,voxel_size)
     target_down, target_fpfh = preprocess_point_cloud(target_down,voxel_size)
     return source, target, source_down, target_down, source_fpfh, target_fpfh
@@ -112,7 +125,7 @@ def compute_init(x,y,idx1=None,idx2=None):
     T, R, t = compute_matrix(src[:dim,idx1].T, dst[:dim,idx2].T)
     return T
 
-def icp(x, y, max_iter=100, threshold=0.00001,init=None,log=None):    
+def icp(x, y, max_iter=100, threshold=0.00001,init=None,logger=None):    
     dim = x.shape[1]
     if init is not None: x = pts_transform(x,init)
     src = np.ones((dim+1,x.shape[0]))
@@ -155,8 +168,8 @@ def icp(x, y, max_iter=100, threshold=0.00001,init=None,log=None):
     start = time()
     T, R, t = compute_matrix(x, src[:dim,:].T)
     time_matrix += time() - start 
-    log.record_nn(time_search)
-    log.record_mat(time_matrix)
+    logger.record_nn(time_search)
+    logger.record_mat(time_matrix)
 
 
     print(f'Time taken to find corresponding points: {round(time_search,3)}s')
@@ -165,31 +178,19 @@ def icp(x, y, max_iter=100, threshold=0.00001,init=None,log=None):
     print(f'Average time for each matrix computation {round(time_matrix/count_matrix,3)}s')
     print(f'Total time taken for ICP: {round(time_search+time_matrix,3)}')
     print(f'cRMS = {round(metric,3)}')
-    return T, dist, i, log
+    return T, dist, i, logger
 
-def calc_one_pair(file1,file2,voxel_size,radius,which='bunny',log=None,init_thres=0.0001):
+def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_thres=0.0001):
     meta_start = time()
+    trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
+                                [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     suffix=''
     f1,f2=file1,file2
-    if which == 'bunny':
-        suffix = 'bunny/data/'
-        if 'bun' in file1: f1 = file1[-3:]
-        if 'bun' in file2: f2 = file2[-3:]
-    elif which == 'happy_stand':
-        suffix = 'happy_stand/data/'
-        f1 = file1[16:]
-        f2 = file2[16:]
-    elif which == 'happy_side':
-        suffix = 'happy_side/data/'
-        f1 = file1[15:]
-        f2 = file2[15:]
-    elif which == 'happy_back':
-        suffix = 'happy_back/data/'
-        f1 = file1[15:]
-        f2 = file2[15:]
+    pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
+    pcd2 = open_csv(get_fname(file2,suffix,which), astype='pcd')
     print(f'==================== Testing {f1}.ply against {f2}.ply ====================')
 
-    pcd1,pcd2,source_down,target_down,source_fpfh,target_fpfh = prepare_dataset(suffix+file1+'.ply',suffix+file2+'.ply',voxel_size)
+    source,target,source_down,target_down,source_fpfh,target_fpfh = prepare_dataset(dcopy(pcd1),dcopy(pcd2),voxel_size)
     #arr1 = source_fpfh.data.T
     #arr2 = target_fpfh.data.T
     arr1 = np.asarray(source_down.points)
@@ -243,82 +244,73 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='bunny',log=None,init_thre
         i = 0
         T = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
     else:
-        T,dist,i,log = icp(pts1,pts2,max_iter=100,threshold=0.00001,init=trans_init,log=log)
+        T,dist,i,logger = icp(pts1,pts2,max_iter=100,threshold=0.00001,init=trans_init,logger=logger)
 
-    log.record_meta(time()-meta_start)
-    print(f'Done in {i} iterations')
+    logger.record_meta(time()-meta_start)
     print(f'Done in {time()-meta_start}s.')
+    print(f'Done in {i} iterations')
     confdir = get_conf_dir(which=which)
-    tx1,ty1,tz1,qx1,qy1,qz1,qw1 = get_quat(confdir,file1)
-    tx2,ty2,tz2,qx2,qy2,qz2,qw2 = get_quat(confdir,file2)
-    t1 = quat_to_mat(tx1,ty1,tz1,qx1,qy1,qz1,qw1)
-    t2 = quat_to_mat(tx2,ty2,tz2,qx2,qy2,qz2,qw2)
-    reGT = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)
+    gt = np.loadtxt(confdir,delimiter=',',skiprows=1,usecols=range(1,17),dtype=np.float32)
+    gt = gt.reshape((-1,4,4))
+    t1 = gt[file1]
+    t2 = gt[file2]
+    t1_inv = inverse_mat(t1)
+    t2_inv = inverse_mat(t2)
+    reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
-    mat = np.matmul(trans_init[:3,:3],t1[:3,:3])
+    # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
 
-    qx1, qy1, qz1, qw1 = mat_to_quat(mat)
-    TE = pnorm(t1[:3,3]-(t2[:3,3]-trans_init[:3,3]), ord=2)
-    RE = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)
-    print(f'For initial estimation, RE = {round(RE,3)}, TE = {round(TE,3)}')
-    draw_registration_result(pcd1, pcd2, trans_init, filename=which+'/baseline_ours/'+f1+'_'+f2+'_init.ply')
+    t_rel = np.matmul(T, trans_init)
 
-
-    mat = np.matmul(T[:3,:3],mat)
-    qx1, qy1, qz1, qw1 = mat_to_quat(mat)
-    if RE > 15: 
-        TE = pnorm(t1[:3,3]-(t2[:3,3]-T[:3,3]-trans_init[:3,3]), ord=2)
-        RE = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)
+    rel = np.matmul(t2_inv,t1)
+    #rel = mul_transform(t1,t2)
+    TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
+    RE = rotation_error(T,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
     print(f'RE = {round(RE,3)}, TE = {round(TE,3)}')
-    log.record_re(RE)
-    log.record_reGT(reGT)
-    log.record_te(TE)
-
-    draw_registration_result(pcd1, pcd2, np.dot(T,trans_init), filename=which+'/baseline_ours/'+f1+'_'+f2+'.ply')
+    #print(f'Extra RE = {rotation_error()}')
+    logger.record_re(RE)
+    logger.record_reGT(reGT)
+    logger.record_te(TE)
+    #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
+    
+    if RE >= 15:
+        print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
+        draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/ours/'+str(file1)+'_'+str(file2)+'_orig.ply')
+        draw_registration_result(pcd1, pcd2, t_rel, filename=which+'/ours/'+str(file1)+'_'+str(file2)+'.ply')
+        print(f'pcd1 is yellow and pcd2 is blue')
+    
     print(f'============================== End of evaluation ==============================\n\n')
-    log.increment()
-    return log
+    logger.increment()
+    return logger
 
 
 if __name__=='__main__':
     RE_list = []
     TE_list = []
     t_list = []
-    log = Logger()
+    logger = Logger()
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='bunny', help='dataset to compare')
+    parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
     parser.add_argument('--radius', type=float, default=0.08, help='radius for NN search')
-    parser.add_argument('--voxel_size', type=float, default=0.002, help='size of each voxel')
+    parser.add_argument('--voxel_size', type=float, default=0.05, help='size of each voxel')
+    parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
 
+    overlap_thresh = FLAGS.overlap
     which = FLAGS.dataset
     voxel_size = FLAGS.voxel_size 
     r = FLAGS.radius
+    files = glob(which+'/data/Hokuyo_*.csv')
+    data_size = len(files)
 
-    if which == dataset[0]:
-        for i in range(len(bunny_files)):
-            for j in range(len(bunny_files)):
-                if i != j:
-                    log = calc_one_pair(bunny_files[i],bunny_files[j],voxel_size=voxel_size,radius=r,which='bunny',log=log)
-    elif which == dataset[1]:
-        for i in range(len(stand_files)):
-            for j in range(len(stand_files)):
-                if np.abs(j-i) < 4 and j != i:
-                    log = calc_one_pair(stand_files[i],stand_files[j],voxel_size=voxel_size,radius=r,which='happy_stand',log=log)
-    elif which == dataset[2]:
-        for i in range(len(side_files)):
-            for j in range(len(side_files)):
-                if np.abs(j-i) < 4 and j != i:
-                    log = calc_one_pair(side_files[i],side_files[j],voxel_size=voxel_size,radius=r,which='happy_side',log=log)
-                    break
-    elif which == dataset[3]:
-        for i in range(len(back_files)):
-            for j in range(len(back_files)):
-                if np.abs(j-i) < 4 and j != i:
-                    log = calc_one_pair(back_files[i],back_files[j],voxel_size=voxel_size,radius=r,which='happy_back',log=log)
+    for f1 in range(data_size):
+        for f2 in range(data_size):
+            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
+            print(f'Computing scan_id {f1} against {f2}')
+            ger = calc_one_pair(f1,f2,voxel_size=voxel_size,radius=r,which=which,logger=logger)
 
     print(f'Results for MY OWN algorithm on {which} dataset.')
-    print(f'In total, {log.count} pairs of point clouds are evaluated.')
-    print(f'Recall rate is {round(log.recall(),2)}')
-    print(f'Average time to compute each pair is {round(log.avg_meta(),3)}s')
+    print(f'In total, {logger.count} pairs of point clouds are evaluated.')
+    print(f'Recall rate is {round(logger.recall(),2)}')
+    print(f'Average time to compute each pair is {round(logger.avg_meta(),3)}s')

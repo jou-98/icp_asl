@@ -135,9 +135,13 @@ stairs/baseline_vanilla/*.ply
 stairs/baseline_vanilla/.DStore
 stairs/baseline_ransac/*.ply
 stairs/baseline_ransac/.DStore
+stairs/ours/*.ply
+stairs/ours/.DStore
 apartment/data/*.csv
 apartment/data/.DStore 
 apartment/baseline_vanilla/*.ply
 apartment/baseline_vanilla/.DStore
 apartment/baseline_ransac/*.ply
 apartment/baseline_ransac/.DStore
+apartment/ours/*.ply
+apartment/ours/.DStore
