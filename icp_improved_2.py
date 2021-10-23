@@ -43,7 +43,7 @@ def voxel_down(pcd1,pcd2,voxel_size):
     else:
         idx = rdm.sample(range(pts2.shape[0]),min_points)
         key2.points = o3d.utility.Vector3dVector(pts2[idx])
-    return key1,key2
+    return pcd_down1, pcd_down2, key1,key2
 
 
 def preprocess_point_cloud(pcd,voxel_size):
@@ -65,12 +65,12 @@ def prepare_dataset(source,target,voxel_size,trans_init=None):
         trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                                 [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     source.transform(trans_init)
-    source_down, target_down = voxel_down(source,target,voxel_size)
+    source_down, target_down, source_key, target_key = voxel_down(source,target,voxel_size)
     #o3d_save_pc(source,'original.ply',pcd_format=True)
     #o3d_save_pc(source_down,'downsampled.ply',pcd_format=True)
-    source_down, source_fpfh = preprocess_point_cloud(source_down,voxel_size)
-    target_down, target_fpfh = preprocess_point_cloud(target_down,voxel_size)
-    return source, target, source_down, target_down, source_fpfh, target_fpfh
+    source_key, source_fpfh = preprocess_point_cloud(source_key,voxel_size)
+    target_key, target_fpfh = preprocess_point_cloud(target_key,voxel_size)
+    return source_down, target_down, source_key, target_key, source_fpfh, target_fpfh
 
 def compute_dist(pts1,pts2,t,idx1,idx2):
     """
@@ -189,8 +189,9 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_
     pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
     pcd2 = open_csv(get_fname(file2,suffix,which), astype='pcd')
     print(f'==================== Testing {f1}.ply against {f2}.ply ====================')
-
+    print(f'Size of original point clouds are {len(np.array(pcd1.points))} and {len(np.array(pcd2.points))}')
     source,target,source_down,target_down,source_fpfh,target_fpfh = prepare_dataset(dcopy(pcd1),dcopy(pcd2),voxel_size)
+    print(f'Size of original point clouds are {len(np.array(pcd1.points))} and {len(np.array(pcd2.points))}')
     #arr1 = source_fpfh.data.T
     #arr2 = target_fpfh.data.T
     arr1 = np.asarray(source_down.points)
@@ -240,9 +241,11 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_
     pts1 = np.asarray(pcd1.points)
     pts2 = np.asarray(pcd2.points)
     print(f'Mean chamfer distance after initial transformation is {np.mean(dist)}')
+    print(f'Size of pts1 is {len(pts1)} and size of pts2 is {len(pts2)}')
     if np.mean(dist) <= init_thres:
         i = 0
         T = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+        print(f'T is identity matrix!')
     else:
         T,dist,i,logger = icp(pts1,pts2,max_iter=100,threshold=0.00001,init=trans_init,logger=logger)
 
