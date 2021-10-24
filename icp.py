@@ -99,7 +99,7 @@ def icp(x, y, max_iter=1000, threshold=0.00001, logger=None):
     print(f'cRMS = {round(metric,3)}')
     return T, dist, i, logger
 
-def calc_one_icp(file1, file2, logger=None, which='bunny'):
+def calc_one_icp(file1, file2, logger=None, which='stairs', downsampling='grid',voxel_size=0.05):
     trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                             [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
@@ -112,7 +112,10 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
     pts1 = np.asarray(source.points)
     pts2 = np.asarray(target.points)
     start = time()
-    pts1, pts2 = downsample(pts1,pts2,method='fps',n_fps=0.3) # Changed from np_rand
+    if downsampling == 'grid':
+        pts1, pts2 = downsample(pts1,pts2,method='grid',voxel_size=voxel_size)
+    else:
+        pts1, pts2 = downsample(pts1,pts2,method='fps',n_fps=0.3)
     print(f'Shape of pts1 is {pts1.shape}')
     print(f'Shape of pts2 is {pts2.shape}')
 
@@ -137,7 +140,7 @@ def calc_one_icp(file1, file2, logger=None, which='bunny'):
 
     rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
-    TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
+    TE = pnorm(t_rel[:3,3]-rel[:3,3], ord=2)
     RE = rotation_error(t_rel,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
     print(f'RE = {round(RE,3)}, TE = {round(TE,3)}')
     #print(f'Extra RE = {rotation_error()}')
@@ -161,6 +164,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='Subset of the ASL dataset to compare')
     parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
+    parser.add_argument('--voxel_size', type=float, default=0.05, help='size of each voxel')
     FLAGS = parser.parse_args()
 
     overlap_thresh = FLAGS.overlap
@@ -171,6 +175,7 @@ if __name__ == "__main__":
     log = Logger()
     
     which = FLAGS.dataset
+    voxel_size = FLAGS.voxel_size
     files = glob(which+'/data/Hokuyo_*.csv')
     data_size = len(files)
 
@@ -178,7 +183,7 @@ if __name__ == "__main__":
         for f2 in range(data_size):
             if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
             print(f'Computing scan_id {f1} against {f2}')
-            log = calc_one_icp(f1,f2,log,which=which)
+            log = calc_one_icp(f1,f2,log,which=which,voxel_size=voxel_size)
 
         
     print(f'Results for (mostly) unmodified ICP algorithm on {which} dataset.')

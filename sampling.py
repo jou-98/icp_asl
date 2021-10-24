@@ -11,7 +11,7 @@ from numpy.random import default_rng
 
 
 # Vanilla sampling method
-def downsample(arr1,arr2,method='default',n_fps=0.3):
+def downsample(arr1,arr2,method='default',n_fps=0.3,voxel_size=0.05):
     pts1 = np.copy(arr1)
     pts2 = np.copy(arr2)
     max_points = max(pts1.shape[0],pts2.shape[0])
@@ -27,7 +27,17 @@ def downsample(arr1,arr2,method='default',n_fps=0.3):
     elif method == 'py_rand':
         idx = rdm.sample(range(max_points),min_points)
     elif method == 'grid':
-        pass 
+        pcd1 = o3d.geometry.PointCloud()
+        pcd2 = o3d.geometry.PointCloud()
+        pcd1.points = o3d.utility.Vector3dVector(pts1)
+        pcd2.points = o3d.utility.Vector3dVector(pts2)
+        pcd1 = pcd1.voxel_down_sample(voxel_size)
+        pcd2 = pcd2.voxel_down_sample(voxel_size)
+        pts1 = np.array(pcd1.points)
+        pts2 = np.array(pcd2.points)
+        max_points = max(pts1.shape[0],pts2.shape[0])
+        min_points = min(pts1.shape[0],pts2.shape[0])
+        idx = rdm.sample(range(max_points),min_points)
     elif method == 'fps':
         pcd1 = o3d.geometry.PointCloud()
         pcd2 = o3d.geometry.PointCloud()

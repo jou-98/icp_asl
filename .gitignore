@@ -145,3 +145,4 @@ apartment/baseline_ransac/*.ply
 apartment/baseline_ransac/.DStore
 apartment/ours/*.ply
 apartment/ours/.DStore
+backup.py
