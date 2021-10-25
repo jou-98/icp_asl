@@ -43,7 +43,7 @@ def voxel_down(pcd1,pcd2,voxel_size):
     else:
         idx = rdm.sample(range(pts2.shape[0]),min_points)
         key2.points = o3d.utility.Vector3dVector(pts2[idx])
-    return key1,key2
+    return key1,key2, pcd_down1, pcd_down2
 
 
 def preprocess_point_cloud(pcd,voxel_size):
@@ -65,12 +65,12 @@ def prepare_dataset(source,target,voxel_size,trans_init=None):
         trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                                 [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     source.transform(trans_init)
-    source_down, target_down = voxel_down(source,target,voxel_size)
+    source_key, target_key, source_down, target_down = voxel_down(source,target,voxel_size)
     #o3d_save_pc(source,'original.ply',pcd_format=True)
     #o3d_save_pc(source_down,'downsampled.ply',pcd_format=True)
-    source_down, source_fpfh = preprocess_point_cloud(source_down,voxel_size)
-    target_down, target_fpfh = preprocess_point_cloud(target_down,voxel_size)
-    return source, target, source_down, target_down, source_fpfh, target_fpfh
+    source_key, source_fpfh = preprocess_point_cloud(source_key,voxel_size)
+    target_key, target_fpfh = preprocess_point_cloud(target_key,voxel_size)
+    return source_down, target_down, source_key, target_key, source_fpfh, target_fpfh
 
 def compute_dist(pts1,pts2,t,idx1,idx2):
     """
