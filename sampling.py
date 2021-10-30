@@ -1,13 +1,14 @@
 import open3d as o3d 
 import numpy as np 
 from time import time
-import glob
+from glob import glob
 from sklearn.cluster import KMeans
 from pathlib import Path
 import copy
 import random as rdm
 from numpy.linalg import norm as pnorm
 from numpy.random import default_rng
+from utils import *
 
 
 # Vanilla sampling method
@@ -65,8 +66,19 @@ def fps(pcd,num_points=2000,return_pts=True):
     if return_pts: return np.asarray(pcd_new.points) 
     return pcd_new
 
-def grid(pts,grid_size=1e-3):
-    pass
+def grid_pcd(pcd1,pcd2,voxel_size=0.05):
+    down1 = pcd1.voxel_down_sample(voxel_size)
+    down2 = pcd2.voxel_down_sample(voxel_size)
+    pts1 = np.array(down1.points)
+    pts2 = np.array(down2.points)
+    max_points = max(pts1.shape[0],pts2.shape[0])
+    min_points = min(pts1.shape[0],pts2.shape[0])
+    idx = rdm.sample(range(max_points),min_points)
+    if pts1.shape[0] == max_points: pts1 = pts1[idx,:]
+    if pts2.shape[0] == max_points: pts2 = pts2[idx,:]
+    down1 = o3d_instance(pts1)
+    down2 = o3d_instance(pts2)
+    return down1, down2
 
 def iss(pcd):
     pass

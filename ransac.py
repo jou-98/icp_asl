@@ -28,9 +28,10 @@ def preprocess_point_cloud(pcd, voxel_size):
     return pcd_down, pcd_fpfh
 
 
-def prepare_dataset(source,target,voxel_size):
+def prepare_dataset(source,target,voxel_size,trans_init=None):
     #print(":: Load two point clouds and disturb initial pose.")
-    trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
+    if trans_init is None:
+        trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                              [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     source.transform(trans_init)
 
@@ -67,15 +68,22 @@ def refine_registration(source, target, source_fpfh, target_fpfh, result_ransac,
 
 def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):    
     meta_start = time()
-    trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
-                                [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+
+
+    trans_init = np.asarray([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0],
+                                [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+    mesh = o3d.geometry.TriangleMesh.create_coordinate_frame()
+    angular_mat = mesh.get_rotation_matrix_from_xyz((np.pi/4, np.pi/2, np.pi/4))
+    trans_init[:3,:3] = angular_mat
+
+
     suffix=''
     f1,f2=file1,file2
     pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
     pcd2 = open_csv(get_fname(file2,suffix,which), astype='pcd')
     print(f'==================== Testing {f1}.ply against {f2}.ply ====================')
 
-    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(dcopy(pcd1),dcopy(pcd2),voxel_size)
+    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(dcopy(pcd1),dcopy(pcd2),voxel_size,trans_init)
 
     result_ransac = execute_global_registration(source_down, target_down,
                                                 source_fpfh, target_fpfh,

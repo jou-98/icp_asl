@@ -14,27 +14,52 @@ from Logger import Logger
 from copy import deepcopy as dcopy
 from time import time
 from glob import glob
-import pyflann
+#import pyflann
 from numpy.linalg import norm as pnorm
 
 def my_dist(x,y):
     return correlation(x,y)
 
+def iss(pcd,salient_radius=0.005,non_max_radius=0.005,gamma_21=0.5,gamma_32=0.5):
+    return o3d.geometry.keypoint.compute_iss_keypoints(pcd,
+                                                        salient_radius=salient_radius,
+                                                        non_max_radius=non_max_radius,
+                                                        gamma_21=gamma_21,
+                                                        gamma_32=gamma_21)
 
 def voxel_down(pcd1,pcd2,voxel_size):
     pcd_down1 = pcd1.voxel_down_sample(voxel_size)
     pcd_down2 = pcd2.voxel_down_sample(voxel_size)
-    pts1 = np.asarray(pcd_down1.points)
-    pts2 = np.asarray(pcd_down2.points)
+
+    key1 = iss(pcd_down1,salient_radius=voxel_size,non_max_radius=voxel_size)
+    key2 = iss(pcd_down2,salient_radius=voxel_size,non_max_radius=voxel_size)
+
+    pts1 = np.asarray(key1.points)
+    pts2 = np.asarray(key2.points)
     min_points = min(pts1.shape[0],pts2.shape[0])
     if pts1.shape[0] >= pts2.shape[0]:
         idx = rdm.sample(range(pts1.shape[0]),min_points)
-        pcd_down1.points = o3d.utility.Vector3dVector(pts1[idx])
+        key1.points = o3d.utility.Vector3dVector(pts1[idx])
     else:
         idx = rdm.sample(range(pts2.shape[0]),min_points)
-        pcd_down2.points = o3d.utility.Vector3dVector(pts2[idx])
-    return pcd_down1,pcd_down2
+        key2.points = o3d.utility.Vector3dVector(pts2[idx])
+    o3d.io.write_point_cloud('test_iss.ply', key1)
+    return key1,key2
 
+def second_down(pcd1,pcd2,voxel_size):
+    down1 = pcd1.voxel_down_sample(voxel_size)
+    down2 = pcd2.voxel_down_sample(voxel_size)
+
+    pts1 = np.asarray(down1.points)
+    pts2 = np.asarray(down2.points)
+    min_points = min(pts1.shape[0],pts2.shape[0])
+    if pts1.shape[0] >= pts2.shape[0]:
+        idx = rdm.sample(range(pts1.shape[0]),min_points)
+        down1.points = o3d.utility.Vector3dVector(pts1[idx])
+    else:
+        idx = rdm.sample(range(pts2.shape[0]),min_points)
+        down2.points = o3d.utility.Vector3dVector(pts2[idx])
+    return down1,down2
 
 def preprocess_point_cloud(pcd,voxel_size):
     radius_normal = voxel_size * 2
@@ -105,7 +130,7 @@ def compute_matrix(x,y):
     T[:dim,dim] = t
     return T, R, t
 
-def compute_init(x,y,idx1=None,idx2=None):
+def compute_init(x,y,idx1=None,idx2=None,trans_init=None):
     dim = x.shape[1]
 
     src = np.ones((dim+1,x.shape[0]))
@@ -113,7 +138,9 @@ def compute_init(x,y,idx1=None,idx2=None):
     src[:dim,:] = np.copy(x.T)
     dst[:dim,:] = np.copy(y.T)
     T, R, t = compute_matrix(src[:dim,idx1].T, dst[:dim,idx2].T)
-    return T
+    newT = T
+    if trans_init is not None: newT = np.matmul(T,trans_init)
+    return T, newT
 
 def icp(x, y, max_iter=100, threshold=0.00001,init=None,logger=None):    
     dim = x.shape[1]
@@ -216,6 +243,7 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_
     print(f'NN search costs {time()-start}s')
     start = time()
     mat[mat==0] = 1000
+    print(f'Size of matrix is {mat.shape}')
     row_ind, col_ind = LSA(mat)
     print(f'Linear sum assignment costs {time()-start}s')
     print(f'Sum of costs is {mat[valid, col_ind[valid]].sum()}')
@@ -223,12 +251,14 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_
     idx = col_ind[valid]
     pts1 = np.asarray(source_down.points)
     pts2 = np.asarray(target_down.points)
-    trans_init = compute_init(pts1,pts2,idx1=valid,idx2=idx)
+    icp_init, trans_init = compute_init(pts1,pts2,idx1=valid,idx2=idx,trans_init=trans_init)
     
 
     dist = compute_dist(pts1,pts2,trans_init,valid,idx)
-    pts1 = np.asarray(pcd1.points)
-    pts2 = np.asarray(pcd2.points)
+    down1, down2 = second_down(pcd1,pcd2,voxel_size)
+    pts1 = np.asarray(down1.points)
+    pts2 = np.asarray(down2.points)
+    print(f'Size of pts1 is {len(pts1)}, size of pts2 is {len(pts2)}')
     print(f'Mean chamfer distance after initial transformation is {np.mean(dist)}')
     if np.mean(dist) <= init_thres:
         i = 0
@@ -254,8 +284,8 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_
 
     rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
-    TE = pnorm(T[:3,3]-rel[:3,3], ord=2)
-    RE = rotation_error(T,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
+    TE = pnorm(t_rel[:3,3]-rel[:3,3], ord=2)
+    RE = rotation_error(t_rel,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
     print(f'RE = {round(RE,3)}, TE = {round(TE,3)}')
     #print(f'Extra RE = {rotation_error()}')
     logger.record_re(RE)
@@ -263,9 +293,9 @@ def calc_one_pair(file1,file2,voxel_size,radius,which='stairs',logger=None,init_
     logger.record_te(TE)
     #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
     
-    if RE >= 15:
+    if RE <= 15:
         print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
-        draw_registration_result(pcd1, pcd2, transformation=None, filename=which+'/ours/'+str(file1)+'_'+str(file2)+'_orig.ply')
+        draw_registration_result(source_down, target_down, transformation=None, filename=which+'/ours/'+str(file1)+'_'+str(file2)+'_orig.ply')
         draw_registration_result(pcd1, pcd2, t_rel, filename=which+'/ours/'+str(file1)+'_'+str(file2)+'.ply')
         print(f'pcd1 is yellow and pcd2 is blue')
     
@@ -282,7 +312,7 @@ if __name__=='__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
-    parser.add_argument('--radius', type=float, default=0.08, help='radius for NN search')
+    parser.add_argument('--radius', type=float, default=1.0, help='radius for NN search')
     parser.add_argument('--voxel_size', type=float, default=0.05, help='size of each voxel')
     parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
