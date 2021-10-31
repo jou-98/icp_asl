@@ -157,7 +157,7 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
 
     logger.record_meta(time()-meta_start)
 
-    confdir = get_conf_dir(which='stairs')
+    confdir = get_conf_dir(which=which)
     gt = np.loadtxt(confdir,delimiter=',',skiprows=1,usecols=range(1,17),dtype=np.float32)
     gt = gt.reshape((-1,4,4))
     t1 = gt[file1]

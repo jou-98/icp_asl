@@ -104,38 +104,29 @@ def calc_one_fgr(file1,file2,voxel_size=0.001,which='bunny',logger=None):
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, default='bunny', help='dataset to compare')
+    parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
     parser.add_argument('--voxel_size', type=float, default=0.001, help='size of each voxel')
+    parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
 
+    voxel_size = FLAGS.voxel_size
+    which = FLAGS.dataset
+    overlap_thresh = FLAGS.overlap
+
+    files = glob(which+'/data/Hokuyo_*.csv')
+    data_size = len(files)
 
     RE_list = []
     TE_list = []
     t_list = []
     log = Logger()
 
-    voxel_size = FLAGS.voxel_size
-    which = FLAGS.dataset
+    for f1 in range(data_size):
+        for f2 in range(data_size):
+            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
+            print(f'Computing scan_id {f1} against {f2}')
+            log = calc_one_ransac(f1,f2,voxel_size=voxel_size,which=which,logger=log)
 
-    if which == 'bunny':
-        for i in range(len(bunny_files)):
-            for j in range(len(bunny_files)):
-                if i != j:
-                    log = calc_one_fgr(bunny_files[i],bunny_files[j],voxel_size=voxel_size,which='bunny',logger=log)
-    elif which == 'happy_stand':
-        for i in range(len(stand_files)):
-            for j in range(len(stand_files)):
-                if j != i and np.abs(j-i)<4:
-                    log = calc_one_fgr(stand_files[i],stand_files[j],voxel_size=voxel_size,which='happy_stand',logger=log)
-    elif which == 'happy_side':
-        for i in range(len(side_files)):
-            for j in range(len(side_files)):
-                if j != i and np.abs(j-i)<4:
-                    log = calc_one_fgr(side_files[i],side_files[j],voxel_size=voxel_size,which='happy_side',logger=log)
-    elif which == 'happy_back':
-        for i in range(len(back_files)):
-            for j in range(len(back_files)):
-                if j != i and np.abs(j-i)<4:
                     log = calc_one_fgr(back_files[i],back_files[j],voxel_size=voxel_size,which='happy_back',logger=log)
     
     print(f'Results for fast global registration algorithm on {which} dataset.')

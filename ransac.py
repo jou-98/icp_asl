@@ -70,12 +70,13 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
     meta_start = time()
 
 
-    trans_init = np.asarray([[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0],
-                                [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+    trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],    
+                             [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+    """                        
     mesh = o3d.geometry.TriangleMesh.create_coordinate_frame()
     angular_mat = mesh.get_rotation_matrix_from_xyz((np.pi/4, np.pi/2, np.pi/4))
     trans_init[:3,:3] = angular_mat
-
+    """
 
     suffix=''
     f1,f2=file1,file2
@@ -115,13 +116,13 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
     logger.record_reGT(reGT)
     logger.record_te(TE)
     #draw_registration_result(pcd1, pcd2, , filename=file1+'_'+file2+'ex.ply')
-    
+    """
     if RE >= 20:
         print(f'Computed ground truth transformation is\n{rel}\nCalculated transformation is\n{T}')
         draw_registration_result(pcd1, pcd2, transformation=rel, filename=which+'/baseline_ransac/'+str(file1)+'_'+str(file2)+'_orig.ply')
         draw_registration_result(pcd1, pcd2, t_rel, filename=which+'/baseline_ransac/'+str(file1)+'_'+str(file2)+'.ply')
         print(f'pcd1 is yellow and pcd2 is blue')
-    
+    """
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
     return logger
