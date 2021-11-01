@@ -145,4 +145,13 @@ apartment/baseline_ransac/*.ply
 apartment/baseline_ransac/.DStore
 apartment/ours/*.ply
 apartment/ours/.DStore
+
+gazebo_summer/data/*.csv
+gazebo_summer/data/.DStore 
+gazebo_summer/baseline_vanilla/*.ply
+gazebo_summer/baseline_vanilla/.DStore
+gazebo_summer/baseline_ransac/*.ply
+gazebo_summer/baseline_ransac/.DStore
+gazebo_summer/ours/*.ply
+gazebo_summer/ours/.DStore
 backup.py

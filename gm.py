@@ -48,11 +48,11 @@ def compute_init(x,y,idx1=None,idx2=None,trans_init=None):
     return T, newT
 
 
-def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radius=0.5,logger=None):
+def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radius=0.5,thres=0.1,logger=None):
     print(f'\n==================== Testing Hokuyo_{file1} against Hokuyo_{file2} ====================')
 
     if trans_init is None: trans_init = np.array([[1.,0.,0.,0.],[0.,1.,0.,0.],[0.,0.,1.,0.],[0.,0.,0.,1.]])
-    print(f'Rotation angle of initial pose disturbance is {euler_angles(trans_init).reshape((-1))}')
+    #print(f'Rotation angle of initial pose disturbance is {euler_angles(trans_init).reshape((-1))}')
 
 
 
@@ -128,10 +128,8 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     #print(f'Max of aff is {np.max(aff)} and min of aff is {np.min(aff)}')
     #aff = np.exp(-0.3*aff)
 
-    print(f'Computing affinity matrix takes {time()-ckpt}s.')
+    #print(f'Computing affinity matrix takes {time()-ckpt}s.')
     ckpt = time() 
-
-    thres = 0.1
 
     bestset = []
 
@@ -145,15 +143,29 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
 
     print(f'Size of best set is {len(bestset)}')
 
-    print(f'Computing the best set takes {time()-ckpt}s.')
+    #print(f'Computing the best set takes {time()-ckpt}s.')
     ckpt = time()
 
     # Draw two pcds
     draw_registration_result(o3d_instance(pts1[bestset]), o3d_instance(pts2[idx[bestset]]), None, filename='test.ply')
 
     icp_init, trans_init = compute_init(pts1,pts2,idx1=bestset,idx2=idx[bestset],trans_init=trans_init)
-    print(f'Initial transformation computation takes {time()-ckpt}s.')
+    #print(f'Initial transformation computation takes {time()-ckpt}s.')
 
+"""
+    dist = compute_dist(pts1,pts2,trans_init,valid,idx)
+    down1, down2 = second_down(pcd1,pcd2,voxel_size)
+    pts1 = np.asarray(down1.points)
+    pts2 = np.asarray(down2.points)
+    print(f'Size of pts1 is {len(pts1)}, size of pts2 is {len(pts2)}')
+    print(f'Mean chamfer distance after initial transformation is {np.mean(dist)}')
+    if np.mean(dist) <= init_thres:
+        i = 0
+        T = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
+    else:
+        T,dist,i,logger = icp(pts1,pts2,max_iter=100,threshold=0.00001,init=trans_init,logger=logger)
+
+"""
 
     logger.record_meta(time()-meta_start)
 
@@ -198,6 +210,7 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
     parser.add_argument('--radius', type=float, default=0.5, help='radius for NN search')
+    parser.add_argument('--thres', type=float, default=0.1, help='Threshold for best set selection')
     parser.add_argument('--voxel_size', type=float, default=0.5, help='size of each voxel')
     parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
@@ -206,13 +219,14 @@ if __name__=='__main__':
     which = FLAGS.dataset
     voxel_size = FLAGS.voxel_size 
     r = FLAGS.radius
+    thres = FLAGS.thres
     files = glob(which+'/data/Hokuyo_*.csv')
     data_size = len(files)
 
     for f1 in range(data_size):
         for f2 in range(data_size):
             if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
-            logger = calc_one_pair(f1,f2,which=which,trans_init=trans_init,voxel_size=voxel_size,radius=r,logger=logger)
+            logger = calc_one_pair(f1,f2,which=which,trans_init=trans_init,voxel_size=voxel_size,radius=r,thres=thres,logger=logger)
     
     print(f'Results for MY OWN algorithm on {which} dataset.')
     print(f'In total, {logger.count} pairs of point clouds are evaluated.')
