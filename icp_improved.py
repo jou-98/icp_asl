@@ -46,20 +46,6 @@ def voxel_down(pcd1,pcd2,voxel_size):
     o3d.io.write_point_cloud('test_iss.ply', key1)
     return key1,key2
 
-def second_down(pcd1,pcd2,voxel_size):
-    down1 = pcd1.voxel_down_sample(voxel_size)
-    down2 = pcd2.voxel_down_sample(voxel_size)
-
-    pts1 = np.asarray(down1.points)
-    pts2 = np.asarray(down2.points)
-    min_points = min(pts1.shape[0],pts2.shape[0])
-    if pts1.shape[0] >= pts2.shape[0]:
-        idx = rdm.sample(range(pts1.shape[0]),min_points)
-        down1.points = o3d.utility.Vector3dVector(pts1[idx])
-    else:
-        idx = rdm.sample(range(pts2.shape[0]),min_points)
-        down2.points = o3d.utility.Vector3dVector(pts2[idx])
-    return down1,down2
 
 def preprocess_point_cloud(pcd,voxel_size):
     radius_normal = voxel_size * 2

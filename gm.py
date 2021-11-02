@@ -9,8 +9,36 @@ from copy import deepcopy
 from Logger import Logger
 import argparse
 from glob import glob
+from scipy.spatial.distance import directed_hausdorff as Hausdorff
 
 
+def compute_dist(pts1,pts2,t,idx1,idx2):
+    """
+    pcd1 = o3d_instance(pts1)
+    pcd2 = o3d_instance(pts2)
+    pcd1.transform(t)
+    dists = np.asarray(pcd1.compute_point_cloud_distance(pcd2))
+    """
+    pts1 = pts_transform(pts1,t)
+    #dists = pnorm(pts1[idx1]-pts2[idx2],ord=2,axis=1)
+    d1,_,_ = Hausdorff(pts1,pts2)
+    d2,_,_ = Hausdorff(pts2,pts1)
+    return max(d1,d2)
+
+def second_down(pcd1,pcd2,voxel_size):
+    down1 = pcd1.voxel_down_sample(voxel_size)
+    down2 = pcd2.voxel_down_sample(voxel_size)
+
+    pts1 = np.asarray(down1.points)
+    pts2 = np.asarray(down2.points)
+    min_points = min(pts1.shape[0],pts2.shape[0])
+    if pts1.shape[0] >= pts2.shape[0]:
+        idx = rdm.sample(range(pts1.shape[0]),min_points)
+        down1.points = o3d.utility.Vector3dVector(pts1[idx])
+    else:
+        idx = rdm.sample(range(pts2.shape[0]),min_points)
+        down2.points = o3d.utility.Vector3dVector(pts2[idx])
+    return down1,down2
 
 def compute_matrix(x,y):
     dim = x.shape[1]
@@ -50,6 +78,7 @@ def compute_init(x,y,idx1=None,idx2=None,trans_init=None):
 
 def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radius=0.5,thres=0.1,logger=None):
     print(f'\n==================== Testing Hokuyo_{file1} against Hokuyo_{file2} ====================')
+    init_thres = 1000
 
     if trans_init is None: trans_init = np.array([[1.,0.,0.,0.],[0.,1.,0.,0.],[0.,0.,1.,0.],[0.,0.,0.,1.]])
     #print(f'Rotation angle of initial pose disturbance is {euler_angles(trans_init).reshape((-1))}')
@@ -152,19 +181,20 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     icp_init, trans_init = compute_init(pts1,pts2,idx1=bestset,idx2=idx[bestset],trans_init=trans_init)
     #print(f'Initial transformation computation takes {time()-ckpt}s.')
 
-
-    dist = compute_dist(pts1,pts2,trans_init,valid,idx)
-    down1, down2 = second_down(pcd1,pcd2,voxel_size)
+    """
+    dist = compute_dist(pts1,pts2,trans_init,bestset,idx[bestset])
+    down1, down2 = second_down(pcd1,pcd2,voxel_size*1.5)
     pts1 = np.asarray(down1.points)
     pts2 = np.asarray(down2.points)
     print(f'Size of pts1 is {len(pts1)}, size of pts2 is {len(pts2)}')
-    print(f'Mean chamfer distance after initial transformation is {np.mean(dist)}')
+    #print(f'Mean chamfer distance after initial transformation is {np.mean(dist)}')
     if np.mean(dist) <= init_thres:
         i = 0
         T = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
     else:
         T,dist,i,logger = icp(pts1,pts2,max_iter=100,threshold=0.00001,init=trans_init,logger=logger)
-
+    """
+    T = np.array([[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]])
 
 
     logger.record_meta(time()-meta_start)
@@ -179,7 +209,7 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
 
-    t_rel = np.matmul(T, trans_init) # trans_init
+    t_rel = np.matmul(T, trans_init)
 
     rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
@@ -194,6 +224,7 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     if RE >= 15 and RE <= 30: draw_registration_result(pcd1, pcd2, t_rel, filename=which+'/ours/'+str(file1)+'_'+str(file2)+'.ply')
     logger.increment()
     print(f'Executing gm.py takes {time()-meta_start}s.')
+    print(f'Recall so far is {round(logger.recall(),2)}')
     return logger
 
 
