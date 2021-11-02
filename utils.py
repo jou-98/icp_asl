@@ -160,8 +160,9 @@ def draw_registration_result(source, target, transformation=None, filename='a+b.
     o3d.io.write_point_cloud(filename, pcd)
 
 def overlap_check(f1,f2,which='stairs',thresh=0.70):
-    if which == 'stairs': fname = './stairs/data/overlap_stairs.csv'
-    if which == 'apartment': fname = './apartment/data/overlap_apartment.csv'
+    #if which == 'stairs': fname = './stairs/data/overlap_stairs.csv'
+    #if which == 'apartment': fname = './apartment/data/overlap_apartment.csv'
+    fname = f'./{which}/data/overlap_{which}.csv'
     percentages = np.genfromtxt(fname,delimiter=',',dtype=np.float32)[:,:-1]
     l = len(percentages)
     percentages = percentages.reshape((l,l))

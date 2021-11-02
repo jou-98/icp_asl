@@ -152,7 +152,7 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     icp_init, trans_init = compute_init(pts1,pts2,idx1=bestset,idx2=idx[bestset],trans_init=trans_init)
     #print(f'Initial transformation computation takes {time()-ckpt}s.')
 
-"""
+
     dist = compute_dist(pts1,pts2,trans_init,valid,idx)
     down1, down2 = second_down(pcd1,pcd2,voxel_size)
     pts1 = np.asarray(down1.points)
@@ -165,7 +165,7 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     else:
         T,dist,i,logger = icp(pts1,pts2,max_iter=100,threshold=0.00001,init=trans_init,logger=logger)
 
-"""
+
 
     logger.record_meta(time()-meta_start)
 
@@ -179,7 +179,7 @@ def calc_one_pair(file1,file2,which='stairs',trans_init=None,voxel_size=0.5,radi
     reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
 
-    t_rel = trans_init
+    t_rel = np.matmul(T, trans_init) # trans_init
 
     rel = np.matmul(t2_inv,t1)
     #rel = mul_transform(t1,t2)
