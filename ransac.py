@@ -125,6 +125,7 @@ def calc_one_ransac(file1,file2,voxel_size=0.001,which='bunny',logger=None):
     """
     print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
+    print(f'Recall so far is {round(logger.recall(),2)}')
     return logger
 
 if __name__=='__main__':
