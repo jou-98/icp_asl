@@ -7,11 +7,13 @@ import argparse
 from Logger import Logger 
 from numpy.linalg import norm as pnorm
 from metadata import *
+from copy import deepcopy as dcopy
 
 
-def prepare_dataset(source,target,voxel_size):
+def prepare_dataset(source,target,voxel_size,trans_init=None):
     print(":: Load two point clouds and disturb initial pose.")
-    trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
+    if trans_init is None:
+        trans_init = np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],
                              [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     source.transform(trans_init)
 
@@ -50,62 +52,51 @@ def calc_one_fgr(file1,file2,voxel_size=0.001,which='bunny',logger=None):
                              [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
     suffix=''
     f1,f2=file1,file2
-    if which == 'bunny':
-        suffix = 'bunny/data/'
-        if 'bun' in file1: f1 = file1[-3:]
-        if 'bun' in file2: f2 = file2[-3:]
-    elif which == 'happy_stand':
-        suffix = 'happy_stand/data/'
-        f1 = file1[16:]
-        f2 = file2[16:]
-    elif which == 'happy_side':
-        suffix = 'happy_side/data/'
-        f1 = file1[15:]
-        f2 = file2[15:]
-    elif which == 'happy_back':
-        suffix = 'happy_back/data/'
-        f1 = file1[15:]
-        f2 = file2[15:]
+    pcd1 = open_csv(get_fname(file1,suffix,which), astype='pcd')
+    pcd2 = open_csv(get_fname(file2,suffix,which), astype='pcd')
     print(f'==================== Testing {f1}.ply against {f2}.ply ====================')
 
     
-    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(suffix+file1+'.ply',suffix+file2+'.ply',voxel_size)
+    source, target, source_down, target_down, source_fpfh, target_fpfh = prepare_dataset(dcopy(pcd1),dcopy(pcd2),voxel_size,trans_init)
     start = time()
     result_fast = execute_fast_global_registration(source_down, target_down,
                                                 source_fpfh, target_fpfh,
                                                 voxel_size)
     print("Fast global registration took %.3f sec.\n" % (time() - start))
-
+    print(f'Size of source is {len(np.array(source_down.points))}, size of target is {len(np.array(target_down.points))}')
     logger.record_meta(time()-meta_start)
     T = result_fast.transformation 
+    t_rel = np.matmul(T, trans_init)
     confdir = get_conf_dir(which=which)
-    tx1,ty1,tz1,qx1,qy1,qz1,qw1 = get_quat(confdir,file1)
-    tx2,ty2,tz2,qx2,qy2,qz2,qw2 = get_quat(confdir,file2)
-    t1 = quat_to_mat(tx1,ty1,tz1,qx1,qy1,qz1,qw1)
-    t2 = quat_to_mat(tx2,ty2,tz2,qx2,qy2,qz2,qw2)
-    reGT = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)
+    gt = np.loadtxt(confdir,delimiter=',',skiprows=1,usecols=range(1,17),dtype=np.float32)
+    gt = gt.reshape((-1,4,4))
+    t1 = gt[file1]
+    t2 = gt[file2]
+    t1_inv = inverse_mat(t1)
+    t2_inv = inverse_mat(t2)
+    reGT = rotation_error(t1_inv, t2_inv)
     print(f'Rotation angle between source and target is {round(reGT,3)}')
-    mat = np.matmul(trans_init[:3,:3],t1[:3,:3])
-    mat = np.matmul(T[:3,:3],mat)
-    qx1, qy1, qz1, qw1 = mat_to_quat(mat)
-    TE = pnorm(t1[:3,3]-(t2[:3,3]-T[:3,3]), ord=2)
-    RE = rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
+    # print(f'Extra RE = {rotation_error(qx1,qy1,qz1,qw1,qx2,qy2,qz2,qw2)}')
+
+    rel = np.matmul(t2_inv,t1)
+    #rel = mul_transform(t1,t2)
+    TE = pnorm(t_rel[:3,3]-rel[:3,3], ord=2)
+    RE = rotation_error(t_rel,rel) #pnorm(t1[:3,:3]-t2[:3,:3], ord=2)
     print(f'RE = {round(RE,3)}, TE = {round(TE,3)}')
+    #print(f'Extra RE = {rotation_error()}')
     logger.record_re(RE)
     logger.record_reGT(reGT)
     logger.record_te(TE)
-
-    #draw_registration_result(source, target, filename=which+'/baseline_fgr/'+f1+'_'+f2+'_orig.ply')
-    #draw_registration_result(source, target, T,filename=which+'/baseline_fgr/'+f1+'_'+f2+'.ply')
-    print(f'============================== End of evaluation ==============================\n\n')
     logger.increment()
+    print(f'Recall so far is {round(logger.recall(),2)}')
+    print(f'============================== End of evaluation ==============================\n\n')
     return logger
 
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
-    parser.add_argument('--voxel_size', type=float, default=0.001, help='size of each voxel')
+    parser.add_argument('--voxel_size', type=float, default=0.05, help='size of each voxel')
     parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
 
@@ -125,9 +116,7 @@ if __name__=='__main__':
         for f2 in range(data_size):
             if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
             print(f'Computing scan_id {f1} against {f2}')
-            log = calc_one_ransac(f1,f2,voxel_size=voxel_size,which=which,logger=log)
-
-                    log = calc_one_fgr(back_files[i],back_files[j],voxel_size=voxel_size,which='happy_back',logger=log)
+            log = calc_one_fgr(f1,f2,voxel_size=voxel_size,which=which,logger=log)
     
     print(f'Results for fast global registration algorithm on {which} dataset.')
     print(f'In total, {log.count} pairs of point clouds are evaluated.')
