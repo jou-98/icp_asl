@@ -241,22 +241,26 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
     parser.add_argument('--radius', type=float, default=0.5, help='radius for NN search')
+    parser.add_argument('--overlap_max', type=float, default=1.0, help='Maximum overlap of pairs of point cloud to be compared')
     parser.add_argument('--thres', type=float, default=0.1, help='Threshold for best set selection')
     parser.add_argument('--voxel_size', type=float, default=0.5, help='size of each voxel')
     parser.add_argument('--overlap', type=float, default=0.6, help='Minimum overlap of pairs of point cloud to be compared')
+    parser.add_argument('--init', type=str, default='None', help='Initial transformation matrix')
     FLAGS = parser.parse_args()
 
     overlap_thresh = FLAGS.overlap
+    overlap_max = FLAGS.overlap_max
     which = FLAGS.dataset
     voxel_size = FLAGS.voxel_size 
     r = FLAGS.radius
     thres = FLAGS.thres
     files = glob(which+'/data/Hokuyo_*.csv')
     data_size = len(files)
+    trans_init = read_init(FLAGS.init)
 
     for f1 in range(data_size):
         for f2 in range(data_size):
-            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
+            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh,overlap_max): continue
             logger = calc_one_pair(f1,f2,which=which,trans_init=trans_init,voxel_size=voxel_size,radius=r,thres=thres,logger=logger)
     
     print(f'Results for MY OWN algorithm on {which} dataset.')

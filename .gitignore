@@ -173,4 +173,7 @@ ETH/baseline_ransac/.DStore
 ETH/ours/*.ply
 ETH/ours/.DStore
 
+# Temporary files used during development
 backup.py
+testing_*.py
+*.ply

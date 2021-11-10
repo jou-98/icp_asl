@@ -62,7 +62,7 @@ def calc_one_fgr(file1,file2,voxel_size=0.001,which='bunny',logger=None):
     result_fast = execute_fast_global_registration(source_down, target_down,
                                                 source_fpfh, target_fpfh,
                                                 voxel_size)
-    print("Fast global registration took %.3f sec.\n" % (time() - start))
+    print("FGR took %.3f sec in total.\n" % (time() - meta_start))
     print(f'Size of source is {len(np.array(source_down.points))}, size of target is {len(np.array(target_down.points))}')
     logger.record_meta(time()-meta_start)
     T = result_fast.transformation 

@@ -10,6 +10,18 @@ from numpy.linalg import norm as pnorm
 BIN_DIR = './bin/'
 LABELs_DIR = './labels/'
 
+def read_init(arg):
+    mat = np.zeros((4,4))
+    if arg == 'None': return np.asarray([[0.0, 0.0, 1.0, 0.0], [1.0, 0.0, 0.0, 0.0],[0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+    splitted = arg.split(',')
+    mesh = o3d.geometry.TriangleMesh.create_coordinate_frame()
+    angles = []
+    for i in range(3):
+        angles.append(np.deg2rad(float(splitted[i])))
+    mat[:3,:3] = mesh.get_rotation_matrix_from_xyz(tuple(angles))
+    mat[3,3] = 1.
+    return mat
+
 
 def open_csv(fname, astype='pcd', skiprows=1):
     pts = np.loadtxt(fname,delimiter=',',skiprows=skiprows, dtype=np.float32)
@@ -159,14 +171,14 @@ def draw_registration_result(source, target, transformation=None, filename='a+b.
     pcd.colors = o3d.utility.Vector3dVector(rgb)
     o3d.io.write_point_cloud(filename, pcd)
 
-def overlap_check(f1,f2,which='stairs',thresh=0.70):
+def overlap_check(f1,f2,which='stairs',thresh=0.70,overlap_max=1.0):
     #if which == 'stairs': fname = './stairs/data/overlap_stairs.csv'
     #if which == 'apartment': fname = './apartment/data/overlap_apartment.csv'
     fname = f'./{which}/data/overlap_{which}.csv'
     percentages = np.genfromtxt(fname,delimiter=',',dtype=np.float32)[:,:-1]
     l = len(percentages)
     percentages = percentages.reshape((l,l))
-    return percentages[f2,f1] >= thresh 
+    return percentages[f2,f1] >= thresh and percentages[f2,f1] <= overlap_max
     
 def inverse_mat(mat):
     newmat = np.zeros_like(mat)

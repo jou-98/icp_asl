@@ -128,10 +128,12 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, default='stairs', help='dataset to compare')
     parser.add_argument('--voxel_size', type=float, default=0.001, help='size of each voxel')
+    parser.add_argument('--overlap_max', type=float, default=1.0, help='Maximum overlap of pairs of point cloud to be compared')
     parser.add_argument('--overlap', type=float, default=0.7, help='Minimum overlap of pairs of point cloud to be compared')
     FLAGS = parser.parse_args()
 
     voxel_size = FLAGS.voxel_size
+    overlap_max = FLAGS.overlap_max
     which = FLAGS.dataset
     overlap_thresh = FLAGS.overlap
 
@@ -145,7 +147,7 @@ if __name__=='__main__':
 
     for f1 in range(data_size):
         for f2 in range(data_size):
-            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh): continue
+            if f1 == f2 or not overlap_check(f1,f2,which,overlap_thresh,overlap_max): continue
             print(f'Computing scan_id {f1} against {f2}')
             log = calc_one_ransac(f1,f2,voxel_size=voxel_size,which=which,logger=log)
 
