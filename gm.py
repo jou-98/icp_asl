@@ -257,6 +257,7 @@ if __name__=='__main__':
     files = glob(which+'/data/Hokuyo_*.csv')
     data_size = len(files)
     trans_init = read_init(FLAGS.init)
+    print(f'trans_init is\n{trans_init}')
 
     for f1 in range(data_size):
         for f2 in range(data_size):
